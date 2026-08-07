@@ -1,11 +1,12 @@
 import asyncio
+import logging
 import sqlite3
 import random
-import logging
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 TOKEN = "8760920369:AAHaP9fo3vpZ2Oo5ZchDRyIX97UC6HNbIrM"
@@ -26,15 +27,13 @@ def init_db():
     )""")
     conn.commit()
     conn.close()
-    logger.info("Database initialized")
 
 init_db()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"User {update.message.from_user.id} started the bot")
     keyboard = [[InlineKeyboardButton("📢 Telegram", callback_data="telegram")]]
     await update.message.reply_text(
-        "Привет! Нажми 'Telegram' для участия в системе взаимных подписок.",
+        "Привет! Нажми 'Telegram' для участия.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -42,7 +41,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    logger.info(f"User {user_id} pressed button: {query.data}")
 
     if query.data == "telegram":
         conn = sqlite3.connect("subscriptions.db")
@@ -65,7 +63,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             [InlineKeyboardButton("⏳ Проверить (20 сек)", callback_data=f"wait_{target[0]}")]
                         ])
                     )
-                    context.user_data["target_id"] = target[0]
                 else:
                     await query.edit_message_text("Нет новых каналов. Попробуй позже.")
             else:
@@ -87,7 +84,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
         context.user_data["waiting_link"] = False
         await update.message.reply_text("Ссылка сохранена! Нажми /start и выбери Telegram.")
-        logger.info(f"User {user_id} saved channel link: {text}")
 
 async def wait_and_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -96,8 +92,6 @@ async def wait_and_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_id = int(query.data.split("_")[1])
 
     await query.edit_message_text("⏳ Жди 20 секунд... Подписка засчитывается автоматически.")
-    logger.info(f"User {user_id} waiting 20s for target {target_id}")
-
     await asyncio.sleep(20)
 
     conn = sqlite3.connect("subscriptions.db")
@@ -108,28 +102,14 @@ async def wait_and_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
 
     await query.edit_message_text("✅ Подписка засчитана! Нажми /start, чтобы продолжить.")
-    logger.info(f"User {user_id} successfully counted subscription for target {target_id}")
 
 def main():
-    logger.info("Starting bot application...")
-    try:
-        app = Application.builder().token(TOKEN).build()
-        logger.info("Application built successfully")
-
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CallbackQueryHandler(button))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        app.add_handler(CallbackQueryHandler(wait_and_confirm, pattern="wait_"))
-
-        logger.info("Handlers added, starting polling...")
-        app.run_polling()
-    except Exception as e:
-        logger.error(f"Critical error in main: {e}", exc_info=True)
-        raise
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CallbackQueryHandler(wait_and_confirm, pattern="wait_"))
+    app.run_polling()
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
-        raise
+    main()
