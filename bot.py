@@ -2,13 +2,9 @@ import asyncio
 import logging
 import sqlite3
 import random
-import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, 
 CallbackQueryHandler, MessageHandler, filters, ContextTypes
-
-import nest_asyncio
-nest_asyncio.apply()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,8 +21,7 @@ def init_db():
         channel_link TEXT,
         tokens INTEGER DEFAULT 0,
         subscribers_needed INTEGER DEFAULT 0,
-        subscribers_received INTEGER DEFAULT 0,
-        is_active INTEGER DEFAULT 0
+        subscribers_received INTEGER DEFAULT 0
     )""")
     cur.execute("""CREATE TABLE IF NOT EXISTS tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,8 +65,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await main_menu(update.message, context)
         else:
             await update.message.reply_text(
-                f"❌ Ты не подписан на канал {MAIN_CHANNEL}.\n"
-                "Подпишись и нажми /start снова."
+                f"❌ Ты не подписан на канал {MAIN_CHANNEL}.\nПодпишись и 
+нажми /start снова."
             )
     except Exception as e:
         logger.error(f"Start error: {e}")
@@ -100,9 +95,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "support":
         await query.edit_message_text(
-            "🆘 *Поддержка*\n\n"
-            "По вопросам пиши: @elvin_support\n"
-            "Или в канал: @ELVINPODPISKA"
+            "🆘 *Поддержка*\n\nПо вопросам пиши: @elvin_support\nИли в 
+канал: @ELVINPODPISKA"
         )
         return
 
@@ -126,8 +120,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(
                 "📌 Вставь ссылку на свой Telegram-канал (t.me/... или 
-t.me/joinchat/...)\n"
-                "Только 1 канал на аккаунт!"
+t.me/joinchat/...)\nТолько 1 канал на аккаунт!"
             )
             context.user_data["waiting_for_link"] = True
 
@@ -178,8 +171,7 @@ tokens) VALUES (?, ?, COALESCE((SELECT tokens FROM users WHERE user_id =
             conn.close()
             context.user_data["waiting_for_amount"] = False
             await update.message.reply_text(f"✅ Ты поставил в очередь на 
-{amount} подписчиков. Они придут автоматически, когда другие пользователи 
-выполнят задания.")
+{amount} подписчиков. Они придут автоматически.")
         except ValueError:
             await update.message.reply_text("❌ Введи число.")
 
@@ -199,9 +191,9 @@ subscribers_needed", (user_id,))
     target = random.choice(others)
     target_id, link = target
     await query.edit_message_text(
-        f"📌 Подпишись на этот канал:\n{link}\n\n"
-        "⚠️ При попытке скама — проверка в течение 3 часов и бан.\n"
-        "После подписки жди 20 секунд — засчитается 1 токен."
+        f"📌 Подпишись на этот канал:\n{link}\n\n⚠️ При попытке скама — 
+проверка в течение 3 часов и бан.\nПосле подписки жди 20 секунд — 
+засчитается 1 токен."
     )
     await asyncio.sleep(20)
     conn2 = sqlite3.connect("subscriptions.db")
