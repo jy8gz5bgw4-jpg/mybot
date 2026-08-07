@@ -39,8 +39,8 @@ def init_db():
 
 init_db()
 
-# ========== МЕНЮ ==========
-async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ========== ГЛАВНОЕ МЕНЮ ==========
+async def main_menu(message, context):
     keyboard = [
         [InlineKeyboardButton("📢 Накрутить подписчиков", 
 callback_data="get_subscribers")],
@@ -56,10 +56,10 @@ callback_data="do_task")],
         "1 задание = 1 токен. 1 токен = 1 подписчик.\n\n"
         "⚠️ При попытке скама — проверка в течение 3 часов и бан."
     )
-    await update.message.reply_text(text, 
+    await message.reply_text(text, 
 reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
-# ========== ПРОВЕРКА ПОДПИСКИ НА ГЛАВНЫЙ КАНАЛ ==========
+# ========== СТАРТ ==========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     try:
@@ -67,7 +67,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if member.status in ["member", "administrator", "creator"]:
             await update.message.reply_text("✅ Подписка подтверждена!")
             await asyncio.sleep(1)
-            await main_menu(update, context)
+            await main_menu(update.message, context)
         else:
             await update.message.reply_text(
                 f"❌ Ты не подписан на канал {MAIN_CHANNEL}.\n"
@@ -122,8 +122,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "do_task":
         if row and row[1]:
-            # уже есть канал — даём задание
-            await give_task(update, context, user_id)
+            await give_task(query, context, user_id)
         else:
             await query.edit_message_text(
                 "📌 Вставь ссылку на свой Telegram-канал (t.me/... или 
@@ -156,7 +155,7 @@ tokens) VALUES (?, ?, COALESCE((SELECT tokens FROM users WHERE user_id =
         context.user_data["waiting_for_link"] = False
         await update.message.reply_text("✅ Ссылка сохранена! Теперь 
 выполняй задания для получения токенов.")
-        await main_menu(update, context)
+        await main_menu(update.message, context)
         return
 
     if context.user_data.get("waiting_for_amount"):
@@ -185,7 +184,7 @@ tokens) VALUES (?, ?, COALESCE((SELECT tokens FROM users WHERE user_id =
             await update.message.reply_text("❌ Введи число.")
 
 # ========== ВЫДАЧА ЗАДАНИЯ ==========
-async def give_task(update, Context, user_id):
+async def give_task(query, context, user_id):
     conn = sqlite3.connect("subscriptions.db")
     cur = conn.cursor()
     cur.execute("SELECT user_id, channel_link FROM users WHERE 
@@ -193,13 +192,13 @@ channel_link IS NOT NULL AND user_id != ? AND subscribers_received <
 subscribers_needed", (user_id,))
     others = cur.fetchall()
     if not others:
-        await update.callback_query.edit_message_text("❌ Нет активных 
-каналов для подписки. Попробуй позже.")
+        await query.edit_message_text("❌ Нет активных каналов для 
+подписки. Попробуй позже.")
         conn.close()
         return
     target = random.choice(others)
     target_id, link = target
-    await update.callback_query.edit_message_text(
+    await query.edit_message_text(
         f"📌 Подпишись на этот канал:\n{link}\n\n"
         "⚠️ При попытке скама — проверка в течение 3 часов и бан.\n"
         "После подписки жди 20 секунд — засчитается 1 токен."
@@ -215,8 +214,8 @@ subscribers_needed", (user_id,))
 subscribers_received + 1 WHERE user_id = ?", (target_id,))
     conn2.commit()
     conn2.close()
-    await update.callback_query.edit_message_text("✅ +1 токен! Можешь 
-продолжить выполнять задания.")
+    await query.edit_message_text("✅ +1 токен! Можешь продолжить 
+выполнять задания.")
 
 # ========== ЗАПУСК ==========
 def main():
